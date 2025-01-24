@@ -5,8 +5,8 @@ TODO:
 
 interface Options {
     linkTarget: string;
-    name: string;
-    workingDirectory: string;
+    name?: string;
+    workingDirectory?: string;
     args?: string;
     icon_location?: string;
 }
@@ -31,17 +31,17 @@ interface Prefix {
 // Declarations
 
 const hasLinkTargetIdList: number = 0x01;
-const hasName: number = 0x04;
-const hasWorkingDir: number = 0x10;
-const hasArguments: number = 0x20;
-const hasIconLocation: number = 0x40;
+let hasName: number = 0x04;
+let hasWorkingDir: number = 0x10;
+let hasArguments: number = 0x20;
+let hasIconLocation: number = 0x40;
 
-const headSize: number[] = [0x4c, 0x00,0x00,0x00];
+const headerSize: number[] = [0x4c, 0x00,0x00,0x00];
 const linkCLSID: number[] = convertCLSIDtoBuff("00021401-0000-0000-c000-000000000046");
 const linkFlags_2_3_4: number[] = [0x01,0x00,0x00];
 const linkFlags: number[] = [];
 
-const fileAttributes: FileAttr = {
+const fileAttr: FileAttr = {
     dir: [0x10,0x00,0x00,0x00],
     file: [0x20,0x00,0x00,0x00]
 };
@@ -64,6 +64,11 @@ const prefix: Prefix = {
     folder: [0x31,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00],
     file: [0x32,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00],
     networkRoot: [0xc3,0x01,0x81]
+};
+
+const clsid: CLSID = {
+    computer: convertCLSIDtoBuff("20d04fe0-3aea-1069-a2d8-08002b30309d"),
+    network: convertCLSIDtoBuff("208d2c60-3aea-1069-a2d7-08002b30309d")
 };
 
 const endOfString: number[] = [0x00];
@@ -111,7 +116,7 @@ function generateLinkFlags(): number[] {
     return flag.concat(linkFlags_2_3_4);
 }
 
-function generateDataString(str: string): number[] {
+function generateDataBuff(str: string): number[] {
     const buff: number[] = strToBuff(str);
     const buffSize: string = (0x10000 + buff.length).toString(16).substring(1);
     return hexToBuff(buffSize.replace(/(..)(..)/, "$2$1")).concat(buff);
@@ -122,4 +127,132 @@ function generateIdList(item: number[]): number[] {
     return hexToBuff(buffSize.replace(/(..)(..)/, '$2$1')).concat(item);
 }
 
+function createLinkFile(options: Options): Blob {
+
+    const {
+        name,
+        workingDirectory,
+        args,
+        icon_location,
+    } = options || {};
+
+    let {
+        linkTarget
+    } = options;
+
+    function buildLinkFlags(): number[] {
+        let stringData: number[] = [];
+        if (name) {
+            stringData = stringData.concat(generateDataBuff(name));
+        } else {
+            hasName = 0x00;
+        }
+
+        if (workingDirectory) {
+            stringData = stringData.concat(generateDataBuff(workingDirectory));
+        } else {
+            hasWorkingDir = 0x00;
+        }
+
+        if (args) {
+            stringData = stringData.concat(generateDataBuff(args));
+        } else {
+            hasArguments = 0x00;
+        }
+
+        if (icon_location) {
+            stringData = stringData.concat(generateDataBuff(icon_location));
+        } else {
+            hasIconLocation = 0x00;
+        }
+        return stringData;
+    }
+    
+    const linkFlags: number[] = generateLinkFlags();
+    const stringData: number[] = buildLinkFlags();
+
+    let targetIsFolder: boolean = false;
+    
+    let prefixRoot: number[];
+    let itemData: number[];
+    let targetRoot: string | number[];
+    let targetLeaf: string | number[] | undefined = undefined;
+
+    let prefixOfTarget: number[];
+    let fileAttributes: number[];
+
+    if (/.*\\+$/.test(linkTarget)) {
+        linkTarget = linkTarget.replace(/\\+$/g, '');
+        targetIsFolder = true;
+    }
+
+    if (linkTarget.substring(0, 2) === "\\\\") {
+        prefixRoot = prefix.networkRoot;
+        itemData = [0x1f, 0x58].concat(clsid.network);
+        targetRoot = linkTarget.substring(linkTarget.lastIndexOf("\\"));
+        if (/\\\\.*\\.*/.test(linkTarget)) {
+            targetLeaf = linkTarget.substring(linkTarget.lastIndexOf("\\") + 1);
+        }
+
+        if (targetRoot === "\\") {
+            targetRoot = linkTarget;
+        }
+    } else {
+        prefixRoot = prefix.localRoot;
+        itemData = [0x1f, 0x50].concat(clsid.computer);
+        targetRoot = linkTarget.replace(/\\.*$/, '\\');
+        if (/.*\\.*/.test(linkTarget)) {
+			targetLeaf = linkTarget.replace(/^.*?\\/, '');
+		}
+    }
+
+    if (!targetIsFolder) {
+        prefixOfTarget = prefix.file;
+        fileAttributes = fileAttr.file;
+    } else {
+        prefixOfTarget = prefix.folder;
+        fileAttributes = fileAttr.dir;
+    }
+
+    targetRoot = strToBuff(targetRoot);
+
+    for (let i = 1; i <= 21; ++i) {
+        targetRoot.push(0);
+    }
+
+    let idListItems: number[] = generateIdList(itemData);
+
+    idListItems = idListItems.concat(
+        generateIdList(prefixRoot.concat(targetRoot, endOfString))
+    );
+
+    if (targetLeaf) {
+        targetLeaf = strToBuff(targetLeaf);
+        idListItems = idListItems.concat(
+            generateIdList(prefixOfTarget.concat(targetLeaf, endOfString))
+        );
+    }
+
+    const idList: number[] = generateIdList(idListItems);
+
+    const data: number[] = headerSize.concat(
+        linkCLSID,
+        linkFlags,
+        fileAttributes,
+        creationTime,
+        accessTime,
+        writeTime,
+        fileSize,
+        iconIndex,
+        showCommand,
+        hotkey,
+        reserved,
+        reserved2,
+        reserved3,
+        idList,
+        terminalID,
+        stringData,
+    );
+    return new Blob([new Uint8Array(data)], { type: "application/x-ms-shortcut"});
+}
 
