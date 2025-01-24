@@ -76,23 +76,20 @@ const endOfString: number[] = [0x00];
 // Helper functions:
 
 function hexToBuff(hex: string): number[] {
-    const result: number[] = [];
-    let i = 0;
-
-    for (; i < hex.length - 1; i += 2) {
-        result.push(+(`0x` + hex.substring(i, i + 2)));
-    }
-
     if (hex.length % 2 !== 0) {
-        result.push(+(`0x0` + hex.charAt(i)));
+        hex = "0" + hex; // Ensure even-length hex string
     }
-
+    const result: number[] = [];
+    for (let i = 0; i < hex.length; i += 2) {
+        result.push(parseInt(hex.substring(i, i + 2), 16));
+    }
     return result;
 }
 
+
 function strToBuff(s: string): number[] {
     return [...s].map((c) => {
-      const code = c.charCodeAt(0);
+      const code: number = c.charCodeAt(0);
       if (code >= 128) {
         throw new Error(`Non-ASCII character detected: ${c}`);
       }
@@ -100,15 +97,19 @@ function strToBuff(s: string): number[] {
     });
   }
 
-function convertCLSIDtoBuff(clsid: string): number[] {
-    const idx: [number, number][] = [[6,2], [4,2], [2,2], [0,2],
-        [11,2], [9,2], [16,2], [14,2],
-        [19,4], [24,12]];
-    const arr: string[] = idx.map((x) => {
-        return clsid.substring(x[0], x[1]);
-    });
+  function convertCLSIDtoBuff(clsid: string): number[] {
+    const parts = clsid.split('-');
+    if (parts.length !== 5) {
+        throw new Error(`Invalid CLSID format: ${clsid}`);
+    }
 
-    return hexToBuff(arr.join(""));
+    return [
+        ...hexToBuff(parts[0]).reverse(), // Little-endian
+        ...hexToBuff(parts[1]).reverse(), // Little-endian
+        ...hexToBuff(parts[2]).reverse(), // Little-endian
+        ...hexToBuff(parts[3]), // Big-endian
+        ...hexToBuff(parts[4])  // Big-endian
+    ];
 }
 
 function generateLinkFlags(): number[] {
@@ -118,14 +119,16 @@ function generateLinkFlags(): number[] {
 
 function generateDataBuff(str: string): number[] {
     const buff: number[] = strToBuff(str);
-    const buffSize: string = (0x10000 + buff.length).toString(16).substring(1);
-    return hexToBuff(buffSize.replace(/(..)(..)/, "$2$1")).concat(buff);
+    const size: number[] = [(buff.length + 2) & 0xff, ((buff.length + 2) >> 8) & 0xff];
+    return [...size, ...buff, 0x00];
 }
 
+
 function generateIdList(item: number[]): number[] {
-    const buffSize: string = (0x0000 + item.length + 2).toString(16).substring(1);
-    return hexToBuff(buffSize.replace(/(..)(..)/, '$2$1')).concat(item);
+    const size = item.length + 2;
+    return [(size & 0xff), (size >> 8) & 0xff].concat(item);
 }
+
 
 function createLinkFile(options: Options): Blob {
 
@@ -141,32 +144,40 @@ function createLinkFile(options: Options): Blob {
     } = options;
 
     function buildLinkFlags(): number[] {
+        let localHasName = hasName;
+        let localHasWorkingDir = hasWorkingDir;
+        let localHasArguments = hasArguments;
+        let localHasIconLocation = hasIconLocation;
+    
         let stringData: number[] = [];
+
         if (name) {
             stringData = stringData.concat(generateDataBuff(name));
         } else {
-            hasName = 0x00;
+            localHasName = 0x00;
         }
-
+    
         if (workingDirectory) {
             stringData = stringData.concat(generateDataBuff(workingDirectory));
         } else {
-            hasWorkingDir = 0x00;
+            localHasWorkingDir = 0x00;
         }
-
+    
         if (args) {
             stringData = stringData.concat(generateDataBuff(args));
         } else {
-            hasArguments = 0x00;
+            localHasArguments = 0x00;
         }
-
+    
         if (icon_location) {
             stringData = stringData.concat(generateDataBuff(icon_location));
         } else {
-            hasIconLocation = 0x00;
+            localHasIconLocation = 0x00;
         }
+    
         return stringData;
     }
+    
     
     const stringData: number[] = buildLinkFlags();
     linkFlags = generateLinkFlags();
@@ -181,30 +192,34 @@ function createLinkFile(options: Options): Blob {
     let prefixOfTarget: number[];
     let fileAttributes: number[];
 
-    if (/.*\\+$/.test(linkTarget)) {
-        linkTarget = linkTarget.replace(/\\+$/g, '');
+    // Remove trailing slashes (excluding network root "\\" paths)
+    if (linkTarget.endsWith("\\") && linkTarget !== "\\\\") {
+        linkTarget = linkTarget.slice(0, -1);
         targetIsFolder = true;
     }
 
-    if (linkTarget.substring(0, 2) === "\\\\") {
-        prefixRoot = prefix.networkRoot;
-        itemData = [0x1f, 0x58].concat(clsid.network);
-        targetRoot = linkTarget.substring(linkTarget.lastIndexOf("\\"));
-        if (/\\\\.*\\.*/.test(linkTarget)) {
-            targetLeaf = linkTarget.substring(linkTarget.lastIndexOf("\\") + 1);
-        }
+    let parts = linkTarget.split("\\");
 
-        if (targetRoot === "\\") {
-            targetRoot = linkTarget;
-        }
-    } else {
-        prefixRoot = prefix.localRoot;
-        itemData = [0x1f, 0x50].concat(clsid.computer);
-        targetRoot = linkTarget.replace(/\\.*$/, '\\');
-        if (/.*\\.*/.test(linkTarget)) {
-			targetLeaf = linkTarget.replace(/^.*?\\/, '');
-		}
+if (linkTarget.startsWith("\\\\")) {
+    prefixRoot = prefix.networkRoot;
+    itemData = [0x1f, 0x58].concat(clsid.network);
+
+    let shareParts = parts.slice(0, 3);
+    targetRoot = shareParts.join("\\") + "\\"; // Ensure share root ends with "\"
+    targetLeaf = parts.slice(3).join("\\"); // Remaining path (if any)
+} else {
+    prefixRoot = prefix.localRoot;
+    itemData = [0x1f, 0x50].concat(clsid.computer);
+
+    targetRoot = parts[0] + "\\"; // Drive letter
+    targetLeaf = parts.slice(1).join("\\"); // Remaining path (if any)
+}
+
+    // Ensure `targetLeaf` is properly handled
+    if (!targetLeaf) {
+        targetLeaf = "";
     }
+
 
     if (!targetIsFolder) {
         prefixOfTarget = prefix.file;
