@@ -39,7 +39,7 @@ let hasIconLocation: number = 0x40;
 const headerSize: number[] = [0x4c, 0x00,0x00,0x00];
 const linkCLSID: number[] = convertCLSIDtoBuff("00021401-0000-0000-c000-000000000046");
 const linkFlags_2_3_4: number[] = [0x01,0x00,0x00];
-const linkFlags: number[] = [];
+let linkFlags: number[] = [];
 
 const fileAttr: FileAttr = {
     dir: [0x10,0x00,0x00,0x00],
@@ -168,15 +168,15 @@ function createLinkFile(options: Options): Blob {
         return stringData;
     }
     
-    const linkFlags: number[] = generateLinkFlags();
     const stringData: number[] = buildLinkFlags();
+    linkFlags = generateLinkFlags();
 
     let targetIsFolder: boolean = false;
     
     let prefixRoot: number[];
     let itemData: number[];
     let targetRoot: string | number[];
-    let targetLeaf: string | number[] | undefined = undefined;
+    let targetLeaf: string | number[] = "";
 
     let prefixOfTarget: number[];
     let fileAttributes: number[];
@@ -226,7 +226,7 @@ function createLinkFile(options: Options): Blob {
         generateIdList(prefixRoot.concat(targetRoot, endOfString))
     );
 
-    if (targetLeaf) {
+    if (targetLeaf && targetLeaf.length) {
         targetLeaf = strToBuff(targetLeaf);
         idListItems = idListItems.concat(
             generateIdList(prefixOfTarget.concat(targetLeaf, endOfString))
@@ -256,3 +256,13 @@ function createLinkFile(options: Options): Blob {
     return new Blob([new Uint8Array(data)], { type: "application/x-ms-shortcut"});
 }
 
+// Test:
+
+const file = createLinkFile({
+    linkTarget: "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+    name: "start witness",
+    workingDirectory: "C:\\Program Files\\Google\\Chrome\\Application",
+    args: "--ssl-key-log-file=D:\\sslkeylogfile.log",
+});
+
+await Bun.write(`{outdir}/test.lnk`, file);
