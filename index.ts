@@ -109,7 +109,7 @@ function createLinkFile(options: Options): Blob {
 
     let stringData: Buffer<ArrayBuffer> = Buffer.alloc(0);
 
-    if (comment) stringData = Buffer.concat([stringData, generateDataBuff(name)]);
+    if (comment) stringData = Buffer.concat([stringData, generateDataBuff(comment)]);
     if (workingDirectory) stringData = Buffer.concat([stringData, generateDataBuff(workingDirectory)]);
     if (args) stringData = Buffer.concat([stringData, generateDataBuff(args)]);
     if (icon_location) stringData = Buffer.concat([stringData, generateDataBuff(icon_location)]);
