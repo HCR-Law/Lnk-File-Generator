@@ -1,6 +1,6 @@
 interface Options {
     linkTarget: string;
-    name?: string;
+    comment?: string;
     workingDirectory?: string;
     args?: string;
     icon_location?: string;
@@ -104,12 +104,12 @@ function generateLinkFlags(): Buffer {
  * });
  */
 function createLinkFile(options: Options): Blob {
-    const { name, workingDirectory, args, icon_location } = options;
+    const { comment, workingDirectory, args, icon_location } = options;
     let { linkTarget } = options;
 
     let stringData: Buffer<ArrayBuffer> = Buffer.alloc(0);
 
-    if (name) stringData = Buffer.concat([stringData, generateDataBuff(name)]);
+    if (comment) stringData = Buffer.concat([stringData, generateDataBuff(name)]);
     if (workingDirectory) stringData = Buffer.concat([stringData, generateDataBuff(workingDirectory)]);
     if (args) stringData = Buffer.concat([stringData, generateDataBuff(args)]);
     if (icon_location) stringData = Buffer.concat([stringData, generateDataBuff(icon_location)]);
