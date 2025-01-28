@@ -89,6 +89,20 @@ function generateLinkFlags(): Buffer {
 
 // Main Function
 
+
+/**
+ * Generates a blob .lnk file.
+ *
+ * @param {Options} options 
+ * @returns {Blob} 
+ * @example
+ * const file = createLinkFile({
+ *   linkTarget: "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+ *   name: "start witness",
+ *   workingDirectory: "C:\\Program Files\\Google\\Chrome\\Application",
+ *   args: "--ssl-key-log-file=D:\\sslkeylogfile.log", // Optional
+ * });
+ */
 function createLinkFile(options: Options): Blob {
     const { name, workingDirectory, args, icon_location } = options;
     let { linkTarget } = options;
