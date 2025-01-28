@@ -98,7 +98,7 @@ function generateLinkFlags(): Buffer {
  * @example
  * const file = createLinkFile({
  *   linkTarget: "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
- *   name: "start witness",
+ *   comment: "Opens up Chrome",
  *   workingDirectory: "C:\\Program Files\\Google\\Chrome\\Application",
  *   args: "--ssl-key-log-file=D:\\sslkeylogfile.log", // Optional
  * });
