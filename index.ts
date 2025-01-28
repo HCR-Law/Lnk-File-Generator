@@ -134,7 +134,10 @@ function createLinkFile(options: Options): Blob {
     return new Blob([data], { type: "application/x-ms-shortcut" });
 }
 
-// Test
+export default createLinkFile;
+
+// Example: 
+/*
 const file = createLinkFile({
     linkTarget: "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
     name: "start witness",
@@ -143,3 +146,4 @@ const file = createLinkFile({
 });
 
 await Bun.write(`{outdir}/test.lnk`, file);
+*/
