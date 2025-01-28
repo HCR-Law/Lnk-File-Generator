@@ -25,15 +25,15 @@ interface Prefix {
 
 // Declarations
 
-const hasLinkTargetIdList = 0x01;
-let hasName = 0x04;
-let hasWorkingDir = 0x10;
-let hasArguments = 0x20;
-let hasIconLocation = 0x40;
+const hasLinkTargetIdList: number = 0x01;
+let hasName: number = 0x04;
+let hasWorkingDir: number = 0x10;
+let hasArguments: number = 0x20;
+let hasIconLocation: number = 0x40;
 
-const headerSize = Buffer.from([0x4c, 0x00, 0x00, 0x00]);
-const linkCLSID = convertCLSIDtoBuff("00021401-0000-0000-c000-000000000046");
-const linkFlags_2_3_4 = Buffer.from([0x01, 0x00, 0x00]);
+const headerSize: Buffer<ArrayBuffer> = Buffer.from([0x4c, 0x00, 0x00, 0x00]);
+const linkCLSID: Buffer<ArrayBufferLike> = convertCLSIDtoBuff("00021401-0000-0000-c000-000000000046");
+const linkFlags_2_3_4: Buffer<ArrayBuffer> = Buffer.from([0x01, 0x00, 0x00]);
 let linkFlags: Buffer;
 
 const fileAttr: FileAttr = {
@@ -93,7 +93,7 @@ function createLinkFile(options: Options): Blob {
     const { name, workingDirectory, args, icon_location } = options;
     let { linkTarget } = options;
 
-    let stringData = Buffer.alloc(0);
+    let stringData: Buffer<ArrayBuffer> = Buffer.alloc(0);
 
     if (name) stringData = Buffer.concat([stringData, generateDataBuff(name)]);
     if (workingDirectory) stringData = Buffer.concat([stringData, generateDataBuff(workingDirectory)]);
@@ -101,10 +101,10 @@ function createLinkFile(options: Options): Blob {
     if (icon_location) stringData = Buffer.concat([stringData, generateDataBuff(icon_location)]);
 
     linkFlags = generateLinkFlags();
-    let targetIsFolder = linkTarget.endsWith("\\") && linkTarget !== "\\";
+    let targetIsFolder: boolean = linkTarget.endsWith("\\") && linkTarget !== "\\";
     if (targetIsFolder) linkTarget = linkTarget.slice(0, -1);
 
-    let parts = linkTarget.split("\\");
+    let parts: string[] = linkTarget.split("\\");
     let prefixRoot: Buffer;
 	let itemData: Buffer;
 	let targetRoot: Buffer;
@@ -126,7 +126,7 @@ function createLinkFile(options: Options): Blob {
     let idList = Buffer.concat([itemData, prefixRoot, targetRoot, endOfString]);
     if (targetLeaf.length) idList = Buffer.concat([idList, prefix.file, targetLeaf, endOfString]);
 
-    const data = Buffer.concat([
+    const data: Buffer<ArrayBuffer> = Buffer.concat([
         headerSize, linkCLSID, linkFlags, fileAttr.file, creationTime, accessTime, writeTime, fileSize,
         iconIndex, showCommand, hotkey, reserved, reserved2, reserved3, idList, terminalID, stringData
     ]);
