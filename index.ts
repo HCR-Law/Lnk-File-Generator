@@ -274,7 +274,7 @@ if (linkTarget.startsWith("\\\\")) {
 export default createLinkFile;
 
 // Test:
-
+/*
 const file = createLinkFile({
     linkTarget: "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
     //name: "start witness",
@@ -283,3 +283,4 @@ const file = createLinkFile({
 });
 
 await Bun.write(`{outdir}/test.lnk`, file);
+*/
