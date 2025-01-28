@@ -130,6 +130,19 @@ function generateIdList(item: number[]): number[] {
 }
 
 
+/**
+ * Generates a .lnk blob file.
+ *
+ * @param {Options} options 
+ * @returns {Blob} 
+ * @example
+ * const file = createLinkFile({
+ *      linkTarget: "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+ *      name: "start witness",
+ *      workingDirectory: "C:\\Program Files\\Google\\Chrome\\Application",
+ *      args: "--ssl-key-log-file=D:\\sslkeylogfile.log",
+ *  });
+ */
 function createLinkFile(options: Options): Blob {
 
     const {
@@ -144,35 +157,22 @@ function createLinkFile(options: Options): Blob {
     } = options;
 
     function buildLinkFlags(): number[] {
-        let localHasName = hasName;
-        let localHasWorkingDir = hasWorkingDir;
-        let localHasArguments = hasArguments;
-        let localHasIconLocation = hasIconLocation;
-    
         let stringData: number[] = [];
 
         if (name) {
             stringData = stringData.concat(generateDataBuff(name));
-        } else {
-            localHasName = 0x00;
         }
-    
+
         if (workingDirectory) {
             stringData = stringData.concat(generateDataBuff(workingDirectory));
-        } else {
-            localHasWorkingDir = 0x00;
         }
     
         if (args) {
             stringData = stringData.concat(generateDataBuff(args));
-        } else {
-            localHasArguments = 0x00;
         }
     
         if (icon_location) {
             stringData = stringData.concat(generateDataBuff(icon_location));
-        } else {
-            localHasIconLocation = 0x00;
         }
     
         return stringData;
@@ -274,13 +274,12 @@ if (linkTarget.startsWith("\\\\")) {
 export default createLinkFile;
 
 // Test:
-/*
+
 const file = createLinkFile({
     linkTarget: "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
-    name: "start witness",
-    workingDirectory: "C:\\Program Files\\Google\\Chrome\\Application",
-    args: "--ssl-key-log-file=D:\\sslkeylogfile.log",
+    //name: "start witness",
+    //workingDirectory: "C:\\Program Files\\Google\\Chrome\\Application",
+    //args: "--ssl-key-log-file=D:\\sslkeylogfile.log",
 });
 
 await Bun.write(`{outdir}/test.lnk`, file);
-*/
