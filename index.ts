@@ -1,8 +1,3 @@
-/* 
-TODO:
-> Refactor to use Buffer type instead of number[]
-*/
-
 interface Options {
     linkTarget: string;
     name?: string;
