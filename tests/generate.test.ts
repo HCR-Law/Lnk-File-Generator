@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { createLinkBlob } from "../refactor";
+import { createLinkBlob } from "../index.ts";
 
 describe("snapshot", () => {
     test("byte value match", async () => {

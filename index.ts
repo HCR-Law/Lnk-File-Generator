@@ -1,251 +1,266 @@
-interface Options {
+import { sep } from "node:path";
+
+export interface Options {
+    
+    /**
+     * The full path string of the destination.
+     * 
+     * The destination must be a file and not a directory.
+     * The file extension must be included.
+     * 
+     * Use backslashes as dir seperators.
+     * Non-ASCII characters are not supported.
+     * 
+     * Note: Not case-sensitive.
+     * @type {string}
+     * @example
+     * "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe"
+     */
     linkTarget: string;
-    name?: string;
+    comment?: string;
     workingDirectory?: string;
     args?: string;
     icon_location?: string;
 }
 
 interface FileAttr {
-    dir: number[];
-    file: number[];
+    dir: Buffer;
+    file: Buffer;
 }
 
 interface CLSID {
-    computer: number[];
-    network: number[];
+    computer: Buffer;
+    network: Buffer;
 }
 
 interface Prefix {
-    localRoot: number[];
-    folder: number[];
-    file: number[];
-    networkRoot: number[];
+    localRoot: Buffer;
+    folder: Buffer;
+    file: Buffer;
+    networkRoot: Buffer;
 }
 
-// Declarations
+const dSep = sep + sep as "\\\\" | "//";
 
-const hasLinkTargetIdList: number = 0x01;
-let hasName: number = 0x04;
-let hasWorkingDir: number = 0x10;
-let hasArguments: number = 0x20;
-let hasIconLocation: number = 0x40;
+// Feature flags (kept as numbers to mirror original behaviour)
+const HAS_LINKTARGET_IDLIST = 0x01;
+const HAS_NAME = 0x04;
+const HAS_WORKINGDIR = 0x10;
+const HAS_ARGUMENTS = 0x20;
+const HAS_ICONLOCATION = 0x40;
 
-const headerSize: number[] = [0x4c, 0x00,0x00,0x00];
-const linkCLSID: number[] = convertCLSIDtoBuff("00021401-0000-0000-c000-000000000046");
-const linkFlags_2_3_4: number[] = [0x01,0x00,0x00];
-let linkFlags: number[] = [];
+// Static buffers
+const headerSize = Buffer.from([0x4c, 0x00, 0x00, 0x00]); // 4 bytes
+const linkFlags_2_3_4 = Buffer.from([0x01, 0x00, 0x00]); // remaining 3 bytes for linkFlags
 
+// file attributes
 const fileAttr: FileAttr = {
-    dir: [0x10,0x00,0x00,0x00],
-    file: [0x20,0x00,0x00,0x00]
+    dir: Buffer.from([0x10, 0x00, 0x00, 0x00]),
+    file: Buffer.from([0x20, 0x00, 0x00, 0x00]),
 };
 
-const creationTime: number[] = [0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00];
-const accessTime: number[] = [0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00];
-const writeTime: number[] = [0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00];
+// timestamps (8 bytes each)
+const creationTime = Buffer.alloc(8, 0x00);
+const accessTime = Buffer.alloc(8, 0x00);
+const writeTime = Buffer.alloc(8, 0x00);
 
-const fileSize: number[] = [0x00,0x00,0x00,0x00];
-const iconIndex: number[] = [0x00,0x00,0x00,0x00];
-const showCommand: number[] = [0x01,0x00,0x00,0x00]; //SW_SHOWNORMAL
-const hotkey: number[] = [0x00,0x00]; // No Hotkey
-const reserved: number[] = [0x00,0x00];
-const reserved2: number[] = [0x00,0x00,0x00,0x00];
-const reserved3: number[] = [0x00,0x00,0x00,0x00];
-const terminalID: number[] = [0x00,0x00];
+// other fixed fields
+const fileSize = Buffer.alloc(4, 0x00);
+const iconIndex = Buffer.alloc(4, 0x00);
+const showCommand = Buffer.from([0x01, 0x00, 0x00, 0x00]); // SW_SHOWNORMAL
+const hotkey = Buffer.from([0x00, 0x00]);
+const reserved = Buffer.from([0x00, 0x00]);
+const reserved2 = Buffer.alloc(4, 0x00);
+const reserved3 = Buffer.alloc(4, 0x00);
+const terminalID = Buffer.from([0x00, 0x00]);
 
 const prefix: Prefix = {
-    localRoot: [0x2f],
-    folder: [0x31,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00],
-    file: [0x32,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00],
-    networkRoot: [0xc3,0x01,0x81]
+    localRoot: Buffer.from([0x2f]),
+    folder: Buffer.from([0x31, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]),
+    file: Buffer.from([0x32, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]),
+    networkRoot: Buffer.from([0xc3, 0x01, 0x81]),
 };
 
+// convert CLSIDs to buffers at module init
+const linkCLSID = convertCLSIDtoBuffer("00021401-0000-0000-c000-000000000046");
 const clsid: CLSID = {
-    computer: convertCLSIDtoBuff("20d04fe0-3aea-1069-a2d8-08002b30309d"),
-    network: convertCLSIDtoBuff("208d2c60-3aea-1069-a2d7-08002b30309d")
+    computer: convertCLSIDtoBuffer("20d04fe0-3aea-1069-a2d8-08002b30309d"),
+    network: convertCLSIDtoBuffer("208d2c60-3aea-1069-a2d7-08002b30309d"),
 };
 
-const endOfString: number[] = [0x00];
+const endOfString = Buffer.from([0x00]);
 
-// Helper functions:
+//#region Helpers
 
-function hexToBuff(hex: string): number[] {
-    if (hex.length % 2 !== 0) {
-        hex = "0" + hex; // Ensure even-length hex string
-    }
-    const result: number[] = [];
-    for (let i = 0; i < hex.length; i += 2) {
-        result.push(parseInt(hex.substring(i, i + 2), 16));
-    }
-    return result;
+/** Convert even-length hex string to Buffer (no 0x prefix expected) */
+function hexToBuffer(hex: string): Buffer {
+    if (hex.length % 2 !== 0) hex = "0" + hex;
+    return Buffer.from(hex, "hex");
 }
-
-
-function strToBuff(s: string): number[] {
-    return [...s].map((c) => {
-      const code: number = c.charCodeAt(0);
-      if (code >= 128) {
-        throw new Error(`Non-ASCII character detected: ${c}`);
-      }
-      return code;
-    });
-  }
-
-  function convertCLSIDtoBuff(clsid: string): number[] {
-    const parts = clsid.split('-');
-    if (parts.length !== 5) {
-        throw new Error(`Invalid CLSID format: ${clsid}`);
-    }
-
-    return [
-        ...hexToBuff(parts[0]).reverse(), // Little-endian
-        ...hexToBuff(parts[1]).reverse(), // Little-endian
-        ...hexToBuff(parts[2]).reverse(), // Little-endian
-        ...hexToBuff(parts[3]), // Big-endian
-        ...hexToBuff(parts[4])  // Big-endian
-    ];
-}
-
-function generateLinkFlags(): number[] {
-    const flag: number[] = [hasLinkTargetIdList + hasName + hasWorkingDir + hasArguments + hasIconLocation];
-    return flag.concat(linkFlags_2_3_4);
-}
-
-function generateDataBuff(str: string): number[] {
-    const buff: number[] = strToBuff(str);
-    const size: number[] = [(buff.length + 2) & 0xff, ((buff.length + 2) >> 8) & 0xff];
-    return [...size, ...buff, 0x00];
-}
-
-
-function generateIdList(item: number[]): number[] {
-    const size = item.length + 2;
-    return [(size & 0xff), (size >> 8) & 0xff].concat(item);
-}
-
 
 /**
- * Generates a .lnk blob file.
- *
- * @param {Options} options 
- * @returns {Blob} 
- * @example
- * const file = createLinkFile({
- *      linkTarget: "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
- *      name: "start witness",
- *      workingDirectory: "C:\\Program Files\\Google\\Chrome\\Application",
- *      args: "--ssl-key-log-file=D:\\sslkeylogfile.log",
- *  });
+ * Convert a simple ASCII-only JS string to a single-byte-per-char Buffer.
  */
-function createLinkFile(options: Options): Blob {
+function strToAnsiBuffer(s: string): Buffer {
+    return Buffer.from(s, "ascii");
+}
 
-    const {
-        name,
-        workingDirectory,
-        args,
-        icon_location,
-    } = options || {};
+/**
+ * Convert a textual CLSID form "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" into
+ * the mixed-endian binary layout used by Windows structures.
+ */
+function convertCLSIDtoBuffer(clsid: string): Buffer {
+    const parts = clsid.split("-");
+    if (parts.length !== 5) throw new Error(`Invalid CLSID format: ${clsid}`);
 
-    let {
-        linkTarget
-    } = options;
+    // parts[0..2] are little-endian groups; parts[3..4] are big-endian
+    const b0 = Buffer.from(hexToBuffer(parts[0])).reverse();
+    const b1 = Buffer.from(hexToBuffer(parts[1])).reverse();
+    const b2 = Buffer.from(hexToBuffer(parts[2])).reverse();
+    const b3 = Buffer.from(hexToBuffer(parts[3])); // no reverse
+    const b4 = Buffer.from(hexToBuffer(parts[4])); // no reverse
 
-    function buildLinkFlags(): number[] {
-        let stringData: number[] = [];
+    return Buffer.concat([b0, b1, b2, b3, b4]);
+}
 
-        if (name) {
-            stringData = stringData.concat(generateDataBuff(name));
-        }
+/** Create the 4-byte LinkFlags: one byte containing our flags followed by 3 static bytes */
+function generateLinkFlags(): Buffer {
+    const first = Buffer.from([
+        HAS_LINKTARGET_IDLIST + HAS_NAME + HAS_WORKINGDIR + HAS_ARGUMENTS + HAS_ICONLOCATION,
+    ]);
+    return Buffer.concat([first, linkFlags_2_3_4]);
+}
 
-        if (workingDirectory) {
-            stringData = stringData.concat(generateDataBuff(workingDirectory));
-        }
-    
-        if (args) {
-            stringData = stringData.concat(generateDataBuff(args));
-        }
-    
-        if (icon_location) {
-            stringData = stringData.concat(generateDataBuff(icon_location));
-        }
-    
-        return stringData;
-    }
-    
-    
-    const stringData: number[] = buildLinkFlags();
-    linkFlags = generateLinkFlags();
+/**
+ * Generate the StringData buffer used in the LNK format.
+ * The original code used (length + 2) and appended a single 0x00 byte.
+ * To remain compatible with original output we preserve that behavior.
+ *
+ * Layout used: 2-byte little-endian size, bytes..., 0x00
+ */
+function generateDataBuffer(s: string): Buffer {
+    const body = strToAnsiBuffer(s);
+    const size = body.length + 2; // preserve original logic
+    const header = Buffer.alloc(2);
+    header.writeUInt16LE(size, 0);
+    return Buffer.concat([header, body, Buffer.from([0x00])]);
+}
 
-    let targetIsFolder: boolean = false;
-    
-    let prefixRoot: number[];
-    let itemData: number[];
-    let targetRoot: string | number[];
-    let targetLeaf: string | number[] = "";
+/**
+ * Generate an IDLIST entry: 2-byte little-endian size followed by item bytes.
+ * The caller should provide `item` as the bytes that represent the item entry.
+ */
+function generateIdList(item: Buffer): Buffer {
+    const size = item.length + 2; // size field includes 2 bytes of the size itself
+    const header = Buffer.alloc(2);
+    header.writeUInt16LE(size, 0);
+    return Buffer.concat([header, item]);
+}
 
-    let prefixOfTarget: number[];
-    let fileAttributes: number[];
+//#region Main
 
-    // Remove trailing slashes (excluding network root "\\" paths)
-    if (linkTarget.endsWith("\\") && linkTarget !== "\\\\") {
+/**
+ * Create a shortcut file as a Buffer.
+ *
+ * @export
+ * @param {Options} options 
+ * @returns {Buffer} 
+ * @throws Will throw an Error on:
+ * - Missing linkTarget option.
+ * - Invalid network path in linkTarget.
+ * - Invalid UNC or missing drive letter in linkTarget
+ */
+export function createLinkBuffer(options: Options): Buffer {
+    if (!options || !options.linkTarget) throw new Error("linkTarget is required");
+
+    const { comment, workingDirectory, args, icon_location } = options;
+    let linkTarget = options.linkTarget;
+
+    // Build string-data section
+    const stringParts: Buffer[] = [];
+    if (comment) stringParts.push(generateDataBuffer(comment));
+    if (workingDirectory) stringParts.push(generateDataBuffer(workingDirectory));
+    if (args) stringParts.push(generateDataBuffer(args));
+    if (icon_location) stringParts.push(generateDataBuffer(icon_location));
+    const stringData = Buffer.concat(stringParts.length ? stringParts : [Buffer.alloc(0)]);
+
+    const linkFlags = generateLinkFlags();
+
+    // target handling
+    let targetIsFolder = false;
+    if (linkTarget.endsWith(sep) && linkTarget !== dSep) {
         linkTarget = linkTarget.slice(0, -1);
         targetIsFolder = true;
     }
 
-    let parts = linkTarget.split("\\");
+    const parts = linkTarget.split(sep);
 
-if (linkTarget.startsWith("\\\\")) {
-    prefixRoot = prefix.networkRoot;
-    itemData = [0x1f, 0x58].concat(clsid.network);
+    let prefixRoot: Buffer;
+    let itemData: Buffer;
+    let targetRootStr: string;
+    let targetLeafStr = "";
 
-    let shareParts = parts.slice(0, 3);
-    targetRoot = shareParts.join("\\") + "\\"; // Ensure share root ends with "\"
-    targetLeaf = parts.slice(3).join("\\"); // Remaining path (if any)
-} else {
-    prefixRoot = prefix.localRoot;
-    itemData = [0x1f, 0x50].concat(clsid.computer);
+    if (linkTarget.startsWith(dSep)) {
+        // network share: \\server\share\rest\...
+        prefixRoot = prefix.networkRoot;
+        itemData = Buffer.concat([Buffer.from([0x1f, 0x58]), clsid.network]);
 
-    targetRoot = parts[0] + "\\"; // Drive letter
-    targetLeaf = parts.slice(1).join("\\"); // Remaining path (if any)
-}
-
-    // Ensure `targetLeaf` is properly handled
-    if (!targetLeaf) {
-        targetLeaf = "";
-    }
-
-
-    if (!targetIsFolder) {
-        prefixOfTarget = prefix.file;
-        fileAttributes = fileAttr.file;
+        // rebuild share root including trailing backslash
+        //const shareParts = parts.slice(0, 3); // ["", "", "server", "share"] -> careful
+        // when split("\\\\server\\share\\...") we get ["", "", "server", "share", ...]
+        // slice(0,3) here results in ["", "", "server"]; original code used slice(0,3),
+        // but to ensure server\share we find the first two non-empty segments:
+        const nonEmpty = parts.filter((p) => p.length > 0);
+        if (nonEmpty.length < 2) throw new Error("Invalid network path");
+        targetRootStr = `${dSep}${nonEmpty[0]}${sep}${nonEmpty[1]}${sep}`;
+        // leaf is the remainder after server\share
+        const leafParts = nonEmpty.slice(2);
+        targetLeafStr = leafParts.join(sep);
     } else {
-        prefixOfTarget = prefix.folder;
-        fileAttributes = fileAttr.dir;
+        // local drive e.g., C:\path\to\file
+        prefixRoot = prefix.localRoot;
+        itemData = Buffer.concat([Buffer.from([0x1f, 0x50]), clsid.computer]);
+
+        if (!parts[0]) throw new Error("Invalid path - expected drive letter or UNC path");
+        targetRootStr = parts[0] + sep; // drive letter + backslash
+        const leafParts = parts.slice(1);
+        targetLeafStr = leafParts.join(sep);
     }
 
-    targetRoot = strToBuff(targetRoot);
+    if (!targetLeafStr) targetLeafStr = "";
 
-    for (let i = 1; i <= 21; ++i) {
-        targetRoot.push(0);
-    }
+    // Choose prefix and file attributes based on whether target is folder
+    const prefixOfTarget = targetIsFolder ? prefix.folder : prefix.file;
+    const fileAttributes = targetIsFolder ? fileAttr.dir : fileAttr.file;
 
-    let idListItems: number[] = generateIdList(itemData);
+    // Convert targetRoot to ANSI bytes and pad with 21 zero bytes as original code does
+    const targetRootBuf = Buffer.concat([strToAnsiBuffer(targetRootStr), Buffer.alloc(21)]);
+    // idList building
+    const idListItems: Buffer[] = [];
 
-    idListItems = idListItems.concat(
-        generateIdList(prefixRoot.concat(targetRoot, endOfString))
+    // itemData entry
+    idListItems.push(generateIdList(itemData));
+
+    // prefixRoot + targetRoot + endOfString entry
+    idListItems.push(
+        generateIdList(Buffer.concat([prefixRoot, targetRootBuf, endOfString]))
     );
 
-    if (targetLeaf && targetLeaf.length) {
-        targetLeaf = strToBuff(targetLeaf);
-        idListItems = idListItems.concat(
-            generateIdList(prefixOfTarget.concat(targetLeaf, endOfString))
+    // optional target leaf
+    if (targetLeafStr && targetLeafStr.length) {
+        const leafBuf = strToAnsiBuffer(targetLeafStr);
+        idListItems.push(
+            generateIdList(Buffer.concat([prefixOfTarget, leafBuf, endOfString]))
         );
     }
 
-    const idList: number[] = generateIdList(idListItems);
+    // Combine idListItems into a single buffer, then wrap with outer idlist size header
+    const combinedIdListItems = Buffer.concat(idListItems);
+    const idList = generateIdList(combinedIdListItems);
 
-    const data: number[] = headerSize.concat(
+    // Compose final data blob according to original order:
+    const components = [
+        headerSize,
         linkCLSID,
         linkFlags,
         fileAttributes,
@@ -262,20 +277,37 @@ if (linkTarget.startsWith("\\\\")) {
         idList,
         terminalID,
         stringData,
-    );
-    return new Blob([new Uint8Array(data)], { type: "application/x-ms-shortcut"});
+    ];
+
+    const full = Buffer.concat(components);
+    return full;
 }
 
-export default createLinkFile;
 
-// Test:
-/*
-const file = createLinkFile({
-    linkTarget: "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
-    //name: "start witness",
-    //workingDirectory: "C:\\Program Files\\Google\\Chrome\\Application",
-    //args: "--ssl-key-log-file=D:\\sslkeylogfile.log",
+/**
+ * Create a shortcut file as a Blob.
+ *
+ * @export
+ * @param {Options} options 
+ * @returns {Blob} 
+ * @throws Will throw an Error on:
+ * - Missing linkTarget option.
+ * - Invalid network path in linkTarget.
+ * - Invalid UNC or missing drive letter in linkTarget
+ * 
+ * 
+ */
+export function createLinkBlob(options: Options): Blob {
+    const buf = createLinkBuffer(options);
+    // convert Buffer -> Uint8Array for Blob constructor
+    return new Blob([new Uint8Array(buf)], { type: "application/x-ms-shortcut" });
+}
+
+export default createLinkBuffer;
+
+/*const test = createLinkBlob({
+    linkTarget: "C:\\Program Files\\Google\\chrome\\Application\\chrome.exe",
+    comment: "Chrome Test",
 });
 
-await Bun.write(`{outdir}/test.lnk`, file);
-*/
+await Bun.write("./outdir/test.lnk", test);*/
